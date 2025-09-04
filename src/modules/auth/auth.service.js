@@ -1,7 +1,8 @@
 const jwt = require('jsonwebtoken');
 const env = require('../../config/env');
 const { User } = require('../../models');
-const generate = require('../../utils/generate'); // Assuming you have a utility to gene
+const generate = require('../../utils/generate');
+const magicLinkService = require('../../service/magicLink.service');
 
 class AuthService {
   static async handleGoogleAuth(profile) {
@@ -32,12 +33,73 @@ class AuthService {
     
     // Generate JWT token
     const token = jwt.sign(
-      { id: user.id, email: user.email },
+      { id: user.id },
       env.JWT_SECRET,
       { expiresIn: '1h' }
     );
     
-    return token;
+    return user.id;
+  }
+
+  static async handleSignup(data){
+    const { protocol, host } = data;
+    let user = await User.findOne({where: {email: data.email}})
+
+    if(user){
+      return {
+        msg: 'User already exists',
+        statusCode: 400
+      }
+    }
+    const newUserId = generate.UserId();
+    const newUser = await User.create({
+      id: newUserId,
+      email: data.email,
+      name: `${data.firstName} ${data.lastName}`,
+      authMethod: 'magic_link'
+    });
+
+    if(newUser){
+      
+      const magicLinkData = await magicLinkService(newUser, protocol, host);
+      
+
+      return {
+        id: newUser.id,
+        magicLinkData
+      }
+    }
+    return {
+      msg: 'something went wrong while creating your account',
+      statusCode: 500
+    }
+  }
+
+  static async handdleSignin(data){
+    const { protocol, host, email } = data;
+
+    // Try to find user by email
+    let user = await User.findOne({where: {email: data.email}})
+
+    if(user){
+      const magicLinkData = await magicLinkService(user, protocol, host);
+      return {
+        msg: 'success',
+        magicLinkData
+      };
+    }
+    return 'failed'
+      
+  }
+
+  static async handdleMagicLinkValidation(token) {
+    try {
+      const decoded = jwt.verify(token, env.JWT_SECRET);
+      return decoded.id;
+    } catch (error) {
+      console.error('Magic link validation failed:', error);
+      return null;
+    }
   }
 }
 
