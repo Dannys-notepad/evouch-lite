@@ -1,20 +1,18 @@
 const passport = require('passport');
 const AuthService = require('./auth.service');
+const sendMessage = require('../../service/message.service')
 
 class AuthController {
   static async googleCallback(req, res) {
     try {
       const uid = await AuthService.handleGoogleAuth(req.user);
-      //console.log(uid)
       req.session.userId = uid;
       res.redirect(`/dashboard`);
-      //res.json({ token });
     } catch (error) {
       console.error('Google authentication failed:', error);
-      res.status(500).json({ error: 'Authentication failed' });
+      await sendMessage('Server Error', 'Could not complete authentication due to server error', 500, res)
     }
   }
-
 
   static async signup(req, res) {
     try {
@@ -26,17 +24,11 @@ class AuthController {
       }
       const result = await AuthService.handleSignup(data);
       if (result.id) {
-        const title = encodeURIComponent('Signup successful');
-        const body = encodeURIComponent('Signup was successful, an email with the login link has been sent to your email address');
-      res.redirect(`/message?title=${title}&body=${body}`);
-      } else {
-        res.redirect(`/message?msg=${result.msg}`);
+        await sendMessage('Success', 'Signup was successful, an email with the login link has been sent to your email address', 200, res)
       }
     } catch (error) {
-      console.error('Magic link signup failed:', error);
-      const title = encodeURIComponent('Signup failed');
-      const body = encodeURIComponent('Something went wrong during signup. Please try again.');
-      res.redirect(`/message?title=${title}&body=${body}`);
+      console.error('Signup failed:', error);
+      await sendMessage('Server Error', 'Something went wrong during signup. Please try again.', 500, res)
     }
   }
 
@@ -50,19 +42,13 @@ class AuthController {
       };
       const result = await AuthService.handdleSignin(data);
       if (result.msg === 'success') {
-        const title = encodeURIComponent('Signin successful');
-        const body = encodeURIComponent('Signin was successful, an email with the login link has been sent to your email address');
-        res.redirect(`/message?title=${title}&body=${body}`);
+        await sendMessage('Success', 'Signin was successful, an email with the login link has been sent to your email address', 200, res)
       } else if (result.msg === 'failed') {
-        const title = encodeURIComponent('Signin failed');
-        const body = encodeURIComponent('User do not exist');
-        res.redirect(`/message?title=${title}&body=${body}`);
+        await sendMessage('Failed', 'User do not exist', 400, res)
       }
     } catch (e) {
       console.error('Signin failed:', e);
-      const title = encodeURIComponent('Signin failed');
-      const body = encodeURIComponent('Something went wrong during signin. Please try again.');
-      res.redirect(`/message?title=${title}&body=${body}`);
+      await sendMessage('Server Error', 'Something went wrong during signin. Please try again.', 500, res)
     }
   }
 
@@ -70,24 +56,20 @@ class AuthController {
     try {
       const { token } = req.query;
       if (!token) {
-        const title = encodeURIComponent('Validation failed');
-        const body = encodeURIComponent('No magic link token provided.');
-        return res.redirect(`/message?title=${title}&body=${body}`);
+        await sendMessage('Failed', 'No token in url.', 400, res)
       }
-      const userId = await AuthService.handdleMagicLinkValidation(token);
-      if (userId) {
-        req.session.userId = userId;
+      const processToken = await AuthService.handdleMagicLinkValidation(token);
+      if (processToken) {
+        req.session.userId = processToken;
         res.redirect(`/dashboard`);
+      } else if (processToken === 'failed') {
+        await sendMessage('Failed', 'The magic link has already been used, or do not exist, sign in again to generate another one', 400, res)
       } else {
-        const title = encodeURIComponent('Validation failed');
-        const body = encodeURIComponent('Invalid or expired magic link');
-        res.redirect(`/message?title=${title}&body=${body}`);
+        await sendMessage('Failed', 'The login link has expired, signin to generate a new one', 400, res)
       }
     } catch (error) {
       console.error('Magic link validation failed:', error);
-      const title = encodeURIComponent('Validation failed');
-      const body = encodeURIComponent('The magic link you provided is invalid or has expired.');
-      res.redirect(`/message?title=${title}&body=${body}`);
+      await sendMessage('Failed', 'The magic link you provided is invalid or has expired.', 400, res)
     }
   }
 }

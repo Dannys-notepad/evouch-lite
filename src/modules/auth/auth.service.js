@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const env = require('../../config/env');
-const { User } = require('../../models');
+const { User, MagicLink } = require('../../models');
 const generate = require('../../utils/generate');
 const magicLinkService = require('../../service/magicLink.service');
 
@@ -20,7 +20,7 @@ class AuthService {
       } else {
         // Create new user
         const userId = generate.UserId();
-        console.log('Generated User ID:', userId);
+        //console.log('Generated User ID:', userId);
         user = await User.create({
             id: userId,
             googleId: profile.id,
@@ -62,7 +62,10 @@ class AuthService {
     if(newUser){
       
       const magicLinkData = await magicLinkService(newUser, protocol, host);
-      
+      const newMagicLink = await MagicLink.create({
+        userId: newUser.id,
+        token: magicLinkData.split('token=')[1]
+      })
 
       return {
         id: newUser.id,
@@ -83,18 +86,27 @@ class AuthService {
 
     if(user){
       const magicLinkData = await magicLinkService(user, protocol, host);
+      const newMagicLink = await MagicLink.create({
+        userId: user.id,
+        token: magicLinkData.split('token=')[1]
+      });
       return {
         msg: 'success',
         magicLinkData
       };
     }
-    return 'failed'
-      
+    return 'failed' 
   }
 
   static async handdleMagicLinkValidation(token) {
     try {
+      const exists = await MagicLink.findOne({ where: { token } });
+      if (exists?.isUsed) {
+        return 'failed';
+      }
       const decoded = jwt.verify(token, env.JWT_SECRET);
+      exists.isUsed = true
+      await exists.save()
       return decoded.id;
     } catch (error) {
       console.error('Magic link validation failed:', error);

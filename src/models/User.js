@@ -1,5 +1,10 @@
-module.exports = (sequelize, DataTypes) => {
-  const User = sequelize.define('User', {
+const { Sequelize, DataTypes, Model } = require('sequelize');
+const sequelize = require('../config/sequelize.db');
+
+class User extends Model {}
+
+User.init(
+  {
     id: {
       type: DataTypes.STRING,
       primaryKey: true,
@@ -23,14 +28,6 @@ module.exports = (sequelize, DataTypes) => {
       unique: true,
       allowNull: true
     },
-    magic_token: {
-      type: DataTypes.STRING,
-      allowNull: true
-    },
-    magic_token_expiry: {
-      type: DataTypes.DATE,
-      allowNull: true
-    },
     createdAt: {
       type: DataTypes.DATE,
       allowNull: false,
@@ -46,10 +43,27 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true
     }
   }, {
+    sequelize,
+    modelName: 'User',
     timestamps: true,
     tableName: 'users',
-    paranoid: true // Enable soft delete
-  });
+    paranoid: true
+  }
+);
 
-  return User;
+// Define associations
+User.associate = function(models) {
+  User.hasMany(models.MagicLink, {
+    foreignKey: 'userId',
+    as: 'magicLinks', // Added alias for consistency
+    onDelete: 'CASCADE'
+  });
+  
+  User.hasMany(models.Event, {
+    foreignKey: 'userId',
+    as: 'events', // Added alias for consistency
+    onDelete: 'CASCADE'
+  });
 };
+
+module.exports = User;

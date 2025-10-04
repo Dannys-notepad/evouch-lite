@@ -9,6 +9,10 @@ module.exports = {
         primaryKey: true,
         allowNull: false
       },
+      name: {
+        type: Sequelize.STRING,
+        allowNull: true
+      },
       email: {
         type: Sequelize.STRING,
         allowNull: false,
@@ -21,18 +25,6 @@ module.exports = {
       googleId: {
         type: Sequelize.STRING,
         unique: true,
-        allowNull: true
-      },
-      magic_token: {
-        type: Sequelize.STRING,
-        allowNull: true
-      },
-      magic_token_expiry: {
-        type: Sequelize.DATE,
-        allowNull: true
-      },
-      name: {
-        type: Sequelize.STRING,
         allowNull: true
       },
       createdAt: {
